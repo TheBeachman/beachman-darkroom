@@ -2,10 +2,10 @@
 
 # Beachman Darkroom
 
-**A macOS image optimizer and converter that never touches the network.**
+**A free, offline image compressor for macOS — built to be driven by Claude.**
 
-Drag in a folder of photos. Get them back 50–90% smaller. Nothing uploads, nothing
-phones home, and it works on a plane.
+Ask Claude to make your images smaller. Or drag them into the app. Either way it runs
+entirely on your Mac: nothing uploads, nothing phones home, and it works with the wifi off.
 
 ![Beachman Darkroom](docs/screenshot-optimizer.png)
 
@@ -13,30 +13,25 @@ phones home, and it works on a plane.
 
 ---
 
-## Why this exists
+## Ask Claude to do it
 
-We were using an app from the Mac App Store called "ImageOptim" to compress product
-photos. It is not the well-known open-source ImageOptim — it's a different app with the
-same name (`com.luoxiao.ImageOptim`), and pulling apart its binary turned up this:
+The reason this exists. Install the included [Claude Code](https://claude.com/claude-code)
+skill and just ask:
 
+> *"compress the photos on my desktop"*
+> *"make these product shots web-ready"*
+> *"convert this folder to WebP"*
+
+```bash
+cp -R skill/compress-images ~/.claude/skills/
 ```
-https://tinypng.com/backend/opt/shrink
-com.luoxiao.tinypng.monthly / .year / .forover
-```
 
-That endpoint is TinyPNG's private web backend — the one their own website calls, not
-their documented API. So every image we compressed was being uploaded to a third party,
-by an app that charges a subscription to relay them, and which also ships Microsoft
-AppCenter and LeanCloud analytics with `NSAllowsArbitraryLoads` enabled. Its own consent
-text confirms the upload.
+Claude figures out the rest — which files, lossy or lossless, what quality — and reports
+what actually changed. The skill teaches it when lossless beats lossy, to check exit
+codes, and to warn you before replacing originals it can't get back. It also tells Claude
+not to fall back to a web compressor, which is rather the point of a local tool.
 
-For a company with unreleased vehicles, that's the wrong pipe to push press photos
-through. So we built a replacement.
-
-The punchline: **there was never anything to steal.** TinyPNG's method is public —
-palette quantization with dithering for PNG, trellis-quantized re-encoding for JPEG — and
-the reference implementations are open source and excellent. Darkroom just runs them
-locally, wrapped in an interface people will actually use.
+Everything below is for when you'd rather do it yourself.
 
 ## What it does
 
@@ -71,14 +66,14 @@ The screenshot at the top of this README was compressed by the app itself: 504 K
 
 ## Install
 
-Download `Beachman Darkroom - Install.zip` from the latest release, unzip, and
-double-click **Install.command**. It copies the app to `/Applications`, clears the
-quarantine flag, and installs the `darkroom` CLI on your `PATH`.
+Download `Beachman Darkroom - Install.zip` from the
+[latest release](../../releases/latest), unzip, and double-click **Install.command**.
+It copies the app to `/Applications`, clears the quarantine flag, and installs the
+`darkroom` CLI on your `PATH`.
 
-Requires **macOS 13+ on Apple Silicon**. The bundled engines are arm64 builds.
+Requires **macOS 13+ on Apple Silicon** — the bundled engines are arm64 builds.
 
-<details>
-<summary>Building from source</summary>
+### Or build it yourself
 
 ```bash
 brew install pngquant oxipng webp gifsicle mozjpeg
@@ -87,9 +82,16 @@ brew install pngquant oxipng webp gifsicle mozjpeg
 
 Needs Xcode Command Line Tools. The build copies each engine and its transitive dylib
 closure into the bundle, rewrites the load paths to `@rpath`, and ad-hoc signs the
-result, so the finished `.app` runs on Macs without Homebrew.
+result, so the finished `.app` runs on Macs without Homebrew. Output lands in `dist/`.
 
-</details>
+### Right-click in Finder
+
+```bash
+./packaging/install-quick-action.sh
+```
+
+Adds a **Compress with Darkroom** item to the Finder right-click menu for images and
+folders. Handy for anyone who won't open a terminal.
 
 ## Command line
 
@@ -110,39 +112,21 @@ darkroom convert --format jpg --bg "#FFFFFF" logo.png
 | `--suffix` | Write `name-min.ext` instead of replacing the original |
 | `--format <fmt>` | png, jpg, jpeg, tiff, heic, heif, webp, bmp, pdf |
 | `--bg "#RRGGBB"` | Background when flattening alpha into jpg/bmp/pdf |
-| `--json` | Machine-readable output |
+| `--json` | Machine-readable output — structured before/after bytes, percentages, engine used, and per-file errors |
 
 Exit codes: `0` all succeeded · `1` one or more failed · `64` usage error.
-
-## Using it from Claude Code
-
-`skill/compress-images/` is a [Claude Code](https://claude.com/claude-code) skill. Drop it
-into `~/.claude/skills/` and any Claude session on that machine can compress images for
-you on request — "make these product shots web-ready", "convert this folder to WebP" —
-without asking how.
-
-```bash
-cp -R skill/compress-images ~/.claude/skills/
-```
-
-The skill teaches Claude the flags, when lossless beats lossy, to check exit codes, and
-to warn before replacing originals it can't get back. It also tells Claude not to fall
-back to a web compressor if the tool is missing, which is rather the point.
-
-`--json` exists for this: agents get structured before/after bytes, percentages, the
-engine used per file, and per-file error reasons, instead of parsing console text.
 
 ## How it works
 
 A small SwiftUI front end over battle-tested command-line compressors. Decoding and
-non-specialised encoding go through Apple's ImageIO (which is what gives us PSD, ICO,
-AVIF and RAW for free); PDF and AI input is rasterised with PDFKit. The specialised
-work is handed to the engines below, run as subprocesses.
+non-specialised encoding go through Apple's ImageIO, which is what gives us PSD, ICO,
+AVIF and RAW for free; PDF and AI input is rasterised with PDFKit. The specialised work
+is handed to the engines below, run as subprocesses.
 
 There's no clever new algorithm here, and that's deliberate — the open-source
-implementations of this problem are better than anything worth reinventing. The value
-added is that they're wrapped in something a non-technical person can use, they ship as
-one signed bundle with no dependency install, and the data never leaves the machine.
+implementations of this problem are already excellent. What's added is that they're
+wrapped in something anyone can use, they ship as one bundle with nothing to install,
+and your images never leave the machine.
 
 ## Third-party engines
 

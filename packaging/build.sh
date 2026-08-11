@@ -146,19 +146,28 @@ for d in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin"; do
     echo "  CLI installed: $d/darkroom"; break
   fi
 done
+if [ -f install-quick-action.sh ]; then
+  bash install-quick-action.sh >/dev/null 2>&1 && \
+    echo "  Finder right-click menu installed" || \
+    echo "  (skipped Finder menu)"
+fi
 echo
 echo "Done. Beachman Darkroom is in your Applications folder."
-echo "Terminal:  darkroom optimize ~/Desktop/photos"
+echo
+echo "  Finder:   right-click images or a folder -> Quick Actions -> Compress with Darkroom"
+echo "  Terminal: darkroom optimize ~/Desktop/photos"
+echo "  Claude:   ask it to compress your images (see the repo for the skill)"
 echo
 read -n 1 -s -r -p "Press any key to close."
 INSTALL
 chmod +x "$ROOT/dist/Install.command"
+cp -f "$PKG/install-quick-action.sh" "$ROOT/dist/install-quick-action.sh"
 
 echo "==> Zipping for distribution"
 cd "$ROOT/dist"
 ditto -c -k --keepParent "Beachman Darkroom.app" "Beachman-Darkroom.zip"
 rm -f "Beachman Darkroom - Install.zip"
-mkdir -p .stage && cp -R "Beachman Darkroom.app" darkroom Install.command .stage/
+mkdir -p .stage && cp -R "Beachman Darkroom.app" darkroom Install.command install-quick-action.sh .stage/
 ditto -c -k --sequesterRsrc .stage "Beachman Darkroom - Install.zip"
 rm -rf .stage
 
