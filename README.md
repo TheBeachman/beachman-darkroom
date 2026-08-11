@@ -66,10 +66,12 @@ The screenshot at the top of this README was compressed by the app itself: 504 K
 
 ## Install
 
-Download `Beachman Darkroom - Install.zip` from the
-[latest release](../../releases/latest), unzip, and double-click **Install.command**.
-It copies the app to `/Applications`, clears the quarantine flag, and installs the
-`darkroom` CLI on your `PATH`.
+Download the installer zip from the [latest release](../../releases/latest), unzip, and
+double-click **Install.command**. It sets up three things:
+
+- the app in `/Applications` (quarantine flag cleared, so it opens on first double-click)
+- the `darkroom` CLI on your `PATH`
+- a **Compress with Darkroom** right-click menu in Finder
 
 Requires **macOS 13+ on Apple Silicon** — the bundled engines are arm64 builds.
 
@@ -84,14 +86,11 @@ Needs Xcode Command Line Tools. The build copies each engine and its transitive 
 closure into the bundle, rewrites the load paths to `@rpath`, and ad-hoc signs the
 result, so the finished `.app` runs on Macs without Homebrew. Output lands in `dist/`.
 
-### Right-click in Finder
+The Finder menu can also be installed on its own, at any time:
 
 ```bash
 ./packaging/install-quick-action.sh
 ```
-
-Adds a **Compress with Darkroom** item to the Finder right-click menu for images and
-folders. Handy for anyone who won't open a terminal.
 
 ## Command line
 
