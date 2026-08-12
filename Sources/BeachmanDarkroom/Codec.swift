@@ -20,7 +20,52 @@ enum Codec {
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceShouldAllowFloat: true
         ]
-        return CGImageSourceCreateImageAtIndex(src, 0, opts as CFDictionary)
+        guard let img = CGImageSourceCreateImageAtIndex(src, 0, opts as CFDictionary) else { return nil }
+        // ImageIO does not apply the EXIF orientation tag; our encodes drop metadata,
+        // so bake the rotation into the pixels or phone photos come out sideways.
+        let o = orientation(in: src)
+        return o <= 1 ? img : (applyingOrientation(img, o) ?? img)
+    }
+
+    /// EXIF orientation (1–8) of the first image in the file; 1 if absent/unreadable.
+    static func orientation(of url: URL) -> UInt32 {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return 1 }
+        return orientation(in: src)
+    }
+
+    private static func orientation(in src: CGImageSource) -> UInt32 {
+        guard let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let raw = props[kCGImagePropertyOrientation] as? UInt32 else { return 1 }
+        return raw
+    }
+
+    /// Redraws `image` with EXIF orientation `o` (2–8) baked in.
+    private static func applyingOrientation(_ image: CGImage, _ o: UInt32) -> CGImage? {
+        let w = CGFloat(image.width), h = CGFloat(image.height)
+        let swaps = (5...8).contains(Int(o))
+        let dw = swaps ? h : w, dh = swaps ? w : h
+
+        var t = CGAffineTransform.identity
+        switch o {
+        case 3, 4: t = t.translatedBy(x: w, y: h).rotated(by: .pi)
+        case 5, 6: t = t.translatedBy(x: 0, y: w).rotated(by: -.pi / 2)
+        case 7, 8: t = t.translatedBy(x: h, y: 0).rotated(by: .pi / 2)
+        default: break
+        }
+        switch o {
+        case 2, 4: t = t.translatedBy(x: w, y: 0).scaledBy(x: -1, y: 1)
+        case 5, 7: t = t.translatedBy(x: h, y: 0).scaledBy(x: -1, y: 1)
+        default: break
+        }
+
+        guard let ctx = CGContext(data: nil, width: Int(dw), height: Int(dh),
+                                  bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return nil }
+        ctx.concatenate(t)
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return ctx.makeImage()
     }
 
     static func rasterizePDF(_ url: URL, scale: CGFloat = 2.0) -> CGImage? {

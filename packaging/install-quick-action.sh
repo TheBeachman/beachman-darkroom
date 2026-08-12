@@ -51,7 +51,7 @@ SUMMARY=$(printf '%s\n' "$OUT" | grep '^TOTAL' | head -1)
 [ -z "$SUMMARY" ] && SUMMARY=$(printf '%s\n' "$OUT" | tail -1)
 [ -z "$SUMMARY" ] && SUMMARY="Nothing to compress."
 
-notify "${SUMMARY#TOTAL }"
+notify "${SUMMARY#TOTAL } → Documents/Beachman Darkroom/Optimizer"
 SCRIPT_EOF
 chmod +x "$WF/Contents/compress.sh"
 

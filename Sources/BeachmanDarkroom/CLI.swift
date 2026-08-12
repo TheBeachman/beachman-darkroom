@@ -28,7 +28,8 @@ enum CLIMain {
 
         var quality = 80
         var lossless = false
-        var inPlace = true
+        var optimizeDest = SaveDestination.library
+        var convertDest = SaveDestination.library
         var json = false
         var format = OutputFormat.jpg
         var bg = "#FFFFFF"
@@ -43,7 +44,9 @@ enum CLIMain {
                 }
                 quality = q
             case "--lossless": lossless = true
-            case "--suffix":   inPlace = false
+            case "--in-place": optimizeDest = .inPlace
+            case "--suffix":   optimizeDest = .suffix
+            case "--beside":   convertDest = .besideOriginal
             case "--json":     json = true
             case "--format":
                 guard let raw = it.next(), let f = OutputFormat(rawValue: raw.lowercased()) else {
@@ -54,7 +57,10 @@ enum CLIMain {
             case "--bg": bg = it.next() ?? "#FFFFFF"
             default:
                 if a.hasPrefix("--") { fail("Unknown option '\(a)'", code: 64) }
-                inputs.append(URL(fileURLWithPath: (a as NSString).expandingTildeInPath))
+                // standardizedFileURL resolves relative paths against the cwd, so
+                // engines always receive absolute paths (never dash-prefixed argv).
+                inputs.append(URL(fileURLWithPath: (a as NSString).expandingTildeInPath)
+                    .standardizedFileURL)
             }
         }
 
@@ -72,9 +78,10 @@ enum CLIMain {
             let before = fileSize(url)
             let result: EngineResult = (verb == "optimize")
                 ? Optimizer.optimize(url: url, settings: OptimizeSettings(
-                    quality: quality, lossless: lossless, inPlace: inPlace))
+                    quality: quality, lossless: lossless, destination: optimizeDest))
                 : Converter.convert(url: url, settings: ConvertSettings(
-                    format: format, quality: quality, background: NSColor(hex: bg).cgColor))
+                    format: format, quality: quality, background: NSColor(hex: bg).cgColor,
+                    destination: convertDest))
 
             switch result {
             case .success(let out):
@@ -171,10 +178,17 @@ enum CLIMain {
           darkroom optimize [options] <files or folders...>
           darkroom convert --format <fmt> [options] <files or folders...>
 
+        OUTPUT
+          By default nothing is overwritten: results are written to
+          ~/Documents/Beachman Darkroom/Optimizer (or /Converter).
+
+          --in-place          optimize: replace the original file
+          --suffix            optimize: write "name-min.ext" beside the original
+          --beside            convert: write beside the original instead of the library
+
         OPTIONS
           --quality <1-100>   Target quality (default 80)
           --lossless          Optimize only; never re-encode pixels (optimize)
-          --suffix            Write "name-min.ext" instead of replacing the original
           --format <fmt>      Output format (convert): \(OutputFormat.allCases.map(\.rawValue).joined(separator: ", "))
           --bg <#RRGGBB>      Background when flattening alpha into jpg/bmp/pdf
           --json              Emit machine-readable JSON (for scripts and agents)

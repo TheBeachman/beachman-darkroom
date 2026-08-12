@@ -65,10 +65,18 @@ enum OutputFormat: String, CaseIterable, Identifiable {
 
 // MARK: - Settings snapshots (passed to background workers)
 
+/// Where results are written.
+enum SaveDestination {
+    case library          // ~/Documents/Beachman Darkroom/<Optimizer|Converter>/ (default)
+    case inPlace          // overwrite the original (optimizer only)
+    case suffix           // "name-min.ext" beside the original (optimizer only)
+    case besideOriginal   // next to the original (converter's overwrite-mode)
+}
+
 struct OptimizeSettings {
     var quality: Int          // 1...100
     var lossless: Bool        // lossless-only pass (no quantization / re-encode)
-    var inPlace: Bool         // overwrite original vs write "name-min.ext"
+    var destination: SaveDestination = .library
     var lossyGIF: Bool = true
 }
 
@@ -76,6 +84,7 @@ struct ConvertSettings {
     var format: OutputFormat
     var quality: Int          // 1...100
     var background: CGColor   // used when target flattens alpha
+    var destination: SaveDestination = .library
 }
 
 // MARK: - Store
@@ -89,7 +98,7 @@ final class Store: ObservableObject {
     // Optimizer prefs
     @AppStorage("quality") var quality: Int = 80
     @AppStorage("lossless") var lossless: Bool = false
-    @AppStorage("inPlace") var inPlace: Bool = true
+    @AppStorage("overwriteOriginals") var overwrite: Bool = false
     @AppStorage("autoStart") var autoStart: Bool = true
 
     // Converter prefs
@@ -163,9 +172,11 @@ final class Store: ObservableObject {
         for (i, _) in jobs { items[i].status = .working }
 
         let mode = self.mode
-        let opt = OptimizeSettings(quality: quality, lossless: lossless, inPlace: inPlace)
+        let opt = OptimizeSettings(quality: quality, lossless: lossless,
+                                   destination: overwrite ? .inPlace : .library)
         let conv = ConvertSettings(format: convertFormat, quality: quality,
-                                   background: NSColor(hex: convertBGHex).cgColor)
+                                   background: NSColor(hex: convertBGHex).cgColor,
+                                   destination: overwrite ? .besideOriginal : .library)
 
         Task.detached(priority: .userInitiated) { [weak self] in
             await withTaskGroup(of: (Int, EngineResult).self) { group in
@@ -189,7 +200,14 @@ final class Store: ObservableObject {
                     await MainActor.run { self?.apply(result, at: index) }
                 }
             }
-            await MainActor.run { self?.isRunning = false }
+            await MainActor.run {
+                guard let self else { return }
+                self.isRunning = false
+                // Files dropped while a run was in flight stay pending — pick them up.
+                if self.autoStart, self.items.contains(where: { $0.status == .pending }) {
+                    self.processAll()
+                }
+            }
         }
     }
 

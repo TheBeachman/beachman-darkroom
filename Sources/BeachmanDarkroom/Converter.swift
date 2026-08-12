@@ -63,16 +63,13 @@ enum Converter {
             }
         }
 
-        // Place next to the original, never clobbering an existing file
-        let base = url.deletingPathExtension().lastPathComponent
-        var dest = url.deletingLastPathComponent().appendingPathComponent("\(base).\(target.rawValue)")
-        var counter = 2
-        while FileManager.default.fileExists(atPath: dest.path) {
-            dest = url.deletingLastPathComponent().appendingPathComponent("\(base) \(counter).\(target.rawValue)")
-            counter += 1
-        }
+        // Default: ~/Documents/Beachman Darkroom/Converter/. Overwrite mode: beside
+        // the original. Never clobbers an existing file either way.
+        let dest = resolveDestination(original: url, destination: settings.destination,
+                                      kind: "Converter", newExt: target.rawValue)
         do {
-            try FileManager.default.copyItem(at: tmp, to: dest)
+            let data = try Data(contentsOf: tmp)
+            try data.write(to: dest, options: .atomic)
         } catch {
             return .fail("Couldn't write: \(error.localizedDescription)")
         }

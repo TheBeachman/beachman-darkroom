@@ -43,26 +43,25 @@ enum Optimizer {
         guard let best = candidate else { return .fail("Optimization failed") }
         let newSize = fileSize(best)
 
-        guard newSize > 0, newSize < originalSize else {
+        let gained = newSize > 0 && newSize < originalSize
+        if !gained, settings.destination != .library {
             // Nothing gained — leave the original untouched.
             return .success(EngineOutput(url: url, bytes: originalSize, note: "Already optimal"))
         }
 
-        // Write the result
-        let dest: URL
-        if settings.inPlace {
-            dest = url
-        } else {
-            let base = url.deletingPathExtension().lastPathComponent
-            dest = url.deletingLastPathComponent().appendingPathComponent("\(base)-min.\(url.pathExtension)")
-        }
+        let dest = resolveDestination(original: url, destination: settings.destination,
+                                      kind: "Optimizer")
         do {
-            let data = try Data(contentsOf: best)
+            // In library mode a no-gain file is still copied out, so a batch always
+            // produces a complete output set.
+            let data = try Data(contentsOf: gained ? best : url)
             try data.write(to: dest, options: .atomic)
         } catch {
             return .fail("Couldn't write result: \(error.localizedDescription)")
         }
-        return .success(EngineOutput(url: dest, bytes: newSize, note: engineNote))
+        return .success(EngineOutput(url: dest,
+                                     bytes: gained ? newSize : originalSize,
+                                     note: gained ? engineNote : "Already optimal"))
     }
 
     // MARK: PNG — pngquant (quantization + dithering) then oxipng (deflate re-squeeze)
@@ -92,7 +91,7 @@ enum Optimizer {
                 "-o", "4", "--strip", "safe", "--quiet",
                 "--out", squeezed.path, current.path
             ])
-            if code == 0, fileSize(squeezed) > 0, fileSize(squeezed) < fileSize(current) || current == url {
+            if code == 0, fileSize(squeezed) > 0, fileSize(squeezed) < fileSize(current) {
                 current = squeezed
                 note = note.isEmpty ? "oxipng" : note + " + oxipng"
             }
@@ -107,11 +106,39 @@ enum Optimizer {
 
     // MARK: JPEG — mozjpeg re-encode (lossy) or jpegtran (lossless)
 
+    /// jpegtran arguments that bake an EXIF orientation into the pixel data.
+    /// Both optimizer paths strip metadata, so the orientation tag must be applied
+    /// as a transform first or rotated photos would come out sideways.
+    private static func jpegtranTransform(forOrientation o: UInt32) -> [String]? {
+        switch o {
+        case 2: return ["-flip", "horizontal"]
+        case 3: return ["-rotate", "180"]
+        case 4: return ["-flip", "vertical"]
+        case 5: return ["-transpose"]
+        case 6: return ["-rotate", "90"]
+        case 7: return ["-transverse"]
+        case 8: return ["-rotate", "270"]
+        default: return nil
+        }
+    }
+
     private static func optimizeJPEG(_ url: URL, scratch: URL, settings: OptimizeSettings) -> (URL?, String) {
+        // Bake the EXIF rotation losslessly before any metadata-stripping pass
+        var input = url
+        if let transform = jpegtranTransform(forOrientation: Codec.orientation(of: url)),
+           ToolRunner.available("jpegtran") {
+            let upright = scratch.appendingPathComponent("up.jpg")
+            if ToolRunner.run("jpegtran", ["-copy", "none"] + transform +
+                              ["-outfile", upright.path, url.path]) == 0,
+               fileSize(upright) > 0 {
+                input = upright
+            }
+        }
+
         if !settings.lossless, ToolRunner.available("cjpeg"), ToolRunner.available("djpeg") {
             let ppm = scratch.appendingPathComponent("d.ppm")
             let out = scratch.appendingPathComponent("m.jpg")
-            if ToolRunner.run("djpeg", ["-outfile", ppm.path, url.path]) == 0,
+            if ToolRunner.run("djpeg", ["-outfile", ppm.path, input.path]) == 0,
                ToolRunner.run("cjpeg", ["-quality", "\(settings.quality)", "-optimize", "-progressive",
                                         "-outfile", out.path, ppm.path]) == 0,
                fileSize(out) > 0 {
@@ -121,7 +148,7 @@ enum Optimizer {
         if ToolRunner.available("jpegtran") {
             let out = scratch.appendingPathComponent("t.jpg")
             if ToolRunner.run("jpegtran", ["-copy", "none", "-optimize", "-progressive",
-                                           "-outfile", out.path, url.path]) == 0,
+                                           "-outfile", out.path, input.path]) == 0,
                fileSize(out) > 0 {
                 return (out, "jpegtran lossless")
             }

@@ -35,7 +35,7 @@ Everything below is for when you'd rather do it yourself.
 
 ## What it does
 
-**Optimizer** — shrink files in place, or alongside as `name-min.ext`.
+**Optimizer** — shrink files without touching the originals.
 
 | Format | Engine | Typical |
 |---|---|---|
@@ -45,9 +45,21 @@ Everything below is for when you'd rather do it yourself.
 | GIF | gifsicle `-O3` | varies |
 | HEIC / TIFF | ImageIO re-encode | varies |
 
-Never writes a file that came out bigger — if there's no gain, the original is left
-alone. Strips EXIF and GPS as a side effect. A lossless mode skips pixel re-encoding
-entirely, for logos and line art where quantization can band flat colour.
+Never writes a file that came out bigger. Strips EXIF and GPS as a side effect (photo
+rotation is baked into the pixels first, so nothing ends up sideways). A lossless mode
+skips pixel re-encoding entirely, for logos and line art where quantization can band
+flat colour.
+
+**Where results go** — by default, nothing is ever overwritten. Output lands in
+
+```
+~/Documents/Beachman Darkroom/Optimizer/     ← optimized copies
+~/Documents/Beachman Darkroom/Converter/     ← converted files
+```
+
+with automatic `name 2.ext` de-duplication. Flip the **Overwrite** switch in the app
+(or pass `--in-place` on the CLI) and the optimizer replaces originals in place
+instead, while the converter saves next to the original file.
 
 **Converter** — reads PNG, JPG, HEIC/HEIF, WebP, GIF, TIFF, BMP, PSD, AI, ICO, AVIF and
 camera RAW (DNG, NEF, CR2, CR3, ARW, RW2, RAF, CRW, MRW, PEF, X3F). Writes PNG, JPG,
@@ -107,18 +119,22 @@ The Finder menu can also be installed on its own, at any time:
 The app is also a CLI. Same engines, no window.
 
 ```bash
-darkroom optimize --quality 80 ~/Desktop/photos      # folders walked recursively
+darkroom optimize --quality 80 ~/Desktop/photos      # → Documents/Beachman Darkroom/Optimizer
+darkroom optimize --in-place --quality 80 shots/     # replace the originals
 darkroom optimize --lossless logo.png                # never re-encode pixels
-darkroom optimize --suffix photo.jpg                 # keep the original
-darkroom convert --format webp --quality 80 shots/
+darkroom convert --format webp --quality 80 shots/   # → Documents/Beachman Darkroom/Converter
 darkroom convert --format jpg --bg "#FFFFFF" logo.png
 ```
+
+Folders are walked recursively; nothing is overwritten unless you say so.
 
 | Option | |
 |---|---|
 | `--quality 1-100` | Target quality, default 80 |
 | `--lossless` | Optimize only, never re-encode pixels |
-| `--suffix` | Write `name-min.ext` instead of replacing the original |
+| `--in-place` | optimize: replace the original file |
+| `--suffix` | optimize: write `name-min.ext` beside the original |
+| `--beside` | convert: write beside the original instead of the library folder |
 | `--format <fmt>` | png, jpg, jpeg, tiff, heic, heif, webp, bmp, pdf |
 | `--bg "#RRGGBB"` | Background when flattening alpha into jpg/bmp/pdf |
 | `--json` | Machine-readable output — structured before/after bytes, percentages, engine used, and per-file errors |

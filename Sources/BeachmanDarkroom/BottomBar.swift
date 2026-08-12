@@ -49,6 +49,18 @@ struct BottomBar: View {
                 }
             }
 
+            // Overwrite toggle (shared)
+            Toggle(isOn: store.$overwrite) {
+                Text("Overwrite")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .toggleStyle(.switch)
+            .controlSize(.mini)
+            .help(store.mode == .optimizer
+                  ? "On: replace originals in place. Off: save to Documents/Beachman Darkroom/Optimizer."
+                  : "On: save beside the original file. Off: save to Documents/Beachman Darkroom/Converter.")
+
             // Quality slider (shared)
             if !(store.mode == .optimizer && store.lossless) {
                 HStack(spacing: 6) {
@@ -130,16 +142,27 @@ struct SettingsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Text("Output")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.secondary)
+            Text(store.overwrite
+                 ? "Overwrite is ON — the optimizer replaces originals in place; the converter saves beside the original."
+                 : "Results go to Documents → Beachman Darkroom → Optimizer / Converter. Originals are never touched.")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Open output folder") {
+                NSWorkspace.shared.activateFileViewerSelecting(
+                    [Library.folder(store.mode == .optimizer ? "Optimizer" : "Converter")])
+            }
+            .controlSize(.small)
+
+            Divider()
+
             Text("Optimizer")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.secondary)
             Toggle("Lossless only (never re-encode pixels)", isOn: store.$lossless)
-            Toggle("Replace originals in place", isOn: store.$inPlace)
-            Text(store.inPlace
-                 ? "Files are overwritten with the smaller version."
-                 : "Results are written next to the original as name-min.ext.")
-                .font(.system(size: 10))
-                .foregroundStyle(.tertiary)
 
             Divider()
 

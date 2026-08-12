@@ -41,17 +41,19 @@ say so and stop.
 
 ## Usage
 
-**Shrink images in place** (replaces originals — the common case):
+**Shrink images** (safe default — originals untouched, results go to
+`~/Documents/Beachman Darkroom/Optimizer/`):
 ```bash
 darkroom optimize --quality 80 ~/Desktop/photos
 ```
 
-**Keep originals**, writing `name-min.ext` alongside:
+**Replace originals in place** (only when the user asked for exactly that):
 ```bash
-darkroom optimize --quality 80 --suffix photo.jpg
+darkroom optimize --in-place --quality 80 ~/Desktop/photos
 ```
 
-**Convert format:**
+**Convert format** (results go to `~/Documents/Beachman Darkroom/Converter/`;
+add `--beside` to save next to the original instead):
 ```bash
 darkroom convert --format webp --quality 80 ~/Desktop/product-shots
 darkroom convert --format jpg --bg "#FFFFFF" logo.png
@@ -70,7 +72,9 @@ Folders are walked recursively. Multiple files/folders can be passed at once.
 |---|---|
 | `--quality 1-100` | Target quality, default 80. 80 is the safe default for web. |
 | `--lossless` | Optimize only, never re-encode pixels. Use for artwork/logos where any loss is unacceptable. |
-| `--suffix` | Write `name-min.ext` instead of replacing the original. |
+| `--in-place` | optimize: replace the original file. Destructive — needs user intent. |
+| `--suffix` | optimize: write `name-min.ext` beside the original. |
+| `--beside` | convert: write next to the original instead of the library folder. |
 | `--format <fmt>` | convert only: png, jpg, jpeg, tiff, heic, heif, webp, bmp, pdf |
 | `--bg "#RRGGBB"` | Background when flattening transparency into jpg/bmp/pdf. Default white. |
 | `--json` | JSON output for parsing. |
@@ -90,11 +94,15 @@ per-file reason is on stderr (or in the JSON `results[].error`).
 
 ## Rules
 
-- **Optimize replaces originals by default.** If the images are irreplaceable or the user
-  hasn't said it's fine, use `--suffix`, or copy them first and say what you did.
+- **The default never overwrites anything** — results land in
+  `~/Documents/Beachman Darkroom/Optimizer` (or `/Converter`), with `name 2.ext`
+  de-duplication. Tell the user where their files ended up.
+- **Only use `--in-place` when the user explicitly wants originals replaced**
+  ("replace them", "shrink them where they are"). It is destructive and strips EXIF.
 - Report actual before/after numbers from the output. Don't estimate savings.
 - The tool never makes a file larger — if there's no gain it reports "Already optimal"
-  and leaves the file untouched. That's a success, not a failure.
+  (in the default mode the unchanged file is still copied to the output folder, so
+  batches always produce a complete set). That's a success, not a failure.
 - Optimizing an already-optimized file gains almost nothing. Don't run it twice.
 - Metadata (EXIF, GPS) is stripped as a side effect of optimize. If the user needs EXIF
   preserved, say so before running — there is currently no keep-metadata flag.
