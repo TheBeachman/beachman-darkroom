@@ -14,10 +14,30 @@ unreleased product imagery (Aviator, BE4), press kits, and customer photos.
 darkroom --version
 ```
 
-If that fails, the app isn't installed on this Mac. Get `Beachman Darkroom - Install.zip`
-from the company Google Drive, unzip, double-click `Install.command`. Do not fall back to
-a web compressor (TinyPNG, Squoosh, iLoveIMG) — uploading company images is the exact
-thing this tool exists to prevent.
+If that works, skip to Usage.
+
+### If it's missing, offer to build it
+
+Building from source is the smoothest path — a locally-built app carries no macOS
+quarantine flag, so there is **no Gatekeeper prompt and no "unidentified developer"
+warning**. Ask the user first, then:
+
+```bash
+brew install pngquant oxipng webp gifsicle mozjpeg
+git clone https://github.com/TheBeachman/beachman-darkroom.git
+cd beachman-darkroom && ./packaging/build.sh
+./dist/Install.command   # or: cp -R "dist/Beachman Darkroom.app" /Applications/
+```
+
+Takes about a minute. Needs Xcode Command Line Tools (`xcode-select --install`) and
+Homebrew. If the user doesn't want Homebrew, point them at the prebuilt installer in the
+[latest release](https://github.com/TheBeachman/beachman-darkroom/releases/latest)
+instead — that one does show a first-launch security prompt, which `Install.command`
+clears automatically.
+
+**Never fall back to a web compressor** (TinyPNG, Squoosh, iLoveIMG). Uploading the
+user's images is the exact thing this tool exists to prevent. If it can't be installed,
+say so and stop.
 
 ## Usage
 

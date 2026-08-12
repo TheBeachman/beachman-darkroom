@@ -75,16 +75,26 @@ double-click **Install.command**. It sets up three things:
 
 Requires **macOS 13+ on Apple Silicon** — the bundled engines are arm64 builds.
 
-### Or build it yourself
+### Or build it — no security prompt this way
 
 ```bash
 brew install pngquant oxipng webp gifsicle mozjpeg
-./packaging/build.sh
+git clone https://github.com/TheBeachman/beachman-darkroom.git
+cd beachman-darkroom && ./packaging/build.sh
 ```
 
-Needs Xcode Command Line Tools. The build copies each engine and its transitive dylib
-closure into the bundle, rewrites the load paths to `@rpath`, and ad-hoc signs the
-result, so the finished `.app` runs on Macs without Homebrew. Output lands in `dist/`.
+Takes about a minute, and needs Xcode Command Line Tools. Output lands in `dist/`; run
+`dist/Install.command` to place it, or just drag the app to `/Applications`.
+
+Worth knowing: **an app you build yourself opens with no security warning.** macOS
+quarantines files that arrive from a browser, not ones compiled on the machine, so
+Gatekeeper never gets involved. The downloaded release is ad-hoc signed and would
+otherwise prompt on first launch — `Install.command` clears that for you — but building
+locally sidesteps it entirely. If you have Claude Code, ask it to do the build.
+
+Under the hood the build copies each engine and its transitive dylib closure into the
+bundle and rewrites the load paths to `@rpath`, so the finished `.app` runs on Macs
+without Homebrew.
 
 The Finder menu can also be installed on its own, at any time:
 
